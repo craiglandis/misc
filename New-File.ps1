@@ -1,4 +1,13 @@
 <#
+This script creates a 20GB file with random data in order to create a reproducible timeout with VM Inspector with a Windows VM
+https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/vm-inspector-azure-virtual-machines
+
+The script should only be used on a test VM as it replaces C:\Windows\Microsoft.NET\Framework\v4.0.30319\Config\machine.config in order to reproduce the timeout.
+
+1. Create a a Windows VM with Standard_LRS HDD storage for the OS disk (not premium SSD). VM size shouldn't matter. Tested on WS22, but any Windows version should work.
+2. 
+
+
 10.00 GB written to 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\Config\largeFile' in 2265 sec. (ca. 4.52 MB/sec.)
 00:37:45.82
 
