@@ -221,7 +221,7 @@ elseif ($copy)
             $line = $line.Split(',')[-1]
             $line = $line.Replace('/','\')
             $line = "C:$line"
-            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path $line -ErrorAction SilentlyContinue"
+            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue"
             foreach ($sourceFile in $sourceFiles)
             {
                 $sourceFilePath = $sourceFile.FullName
