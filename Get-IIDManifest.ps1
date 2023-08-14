@@ -180,6 +180,33 @@ if ($show)
 }
 elseif ($copy)
 {
+    $chocoExePath = 'C:\ProgramData\chocolatey\bin\choco.exe'
+    $chocolateyInstalled = Test-Path -Path $chocoExePath -PathType Leaf
+    if ($chocolateyInstalled -eq $false)
+    {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    }
+
+    $7zExePortablePath = "C:\ProgramData\chocolatey\lib\7zip.portable\tools\7z.exe"
+    $7zExeInstallPath = "C:\Program Files\7-zip\7z.exe"
+
+    $7zExePath = Get-Item -Path $7zPortableExePath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -ErrorAction SilentlyContinue
+    if (!$7zExePath)
+    {
+        $7zExePath = Get-Item -Path $7zExeInstallPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -ErrorAction SilentlyContinue
+    }
+    if ($7zExePath)
+    {
+        Out-Log "Found 7z.exe: $7zExePath"
+    }
+    else
+    {
+        Write-PSFMessage "Installing 7z.exe portable"
+        &$chocoExePath install 7zip.portable -y
+    }
+
     $destinationRoot = "$outputPath\$($env:computername)_$(Get-Date -Format yyyyMMddHHmmss)"
     if ((Test-Path -Path $destinationRoot -PathType Container) -eq $false)
     {
@@ -206,10 +233,10 @@ elseif ($copy)
             }
         }
     }
-    $7zExePath = 'C:\Program Files\7-zip\7z.exe'
-    if (Test-Path -Path $7zExePath -PathType Leaf)
+
+    if ($7zExePath)
     {
-        Invoke-ExpressionWithLogging "& 'C:\Program Files\7-zip\7z.exe' -bd a $destinationRoot.7z $destinationRoot\*" | Out-Null
+        Invoke-ExpressionWithLogging "&$7zExePath -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
     }
     elseif (Get-Command -Name Compress-Archive -ErrorAction SilentlyContinue)
     {
