@@ -192,7 +192,7 @@ elseif ($copy)
     $7zExePortablePath = "C:\ProgramData\chocolatey\lib\7zip.portable\tools\7z.exe"
     $7zExeInstallPath = "C:\Program Files\7-zip\7z.exe"
 
-    $7zExePath = Get-Item -Path $7zPortableExePath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -ErrorAction SilentlyContinue
+    $7zExePath = Get-Item -Path $7zExePortablePath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -ErrorAction SilentlyContinue
     if (!$7zExePath)
     {
         $7zExePath = Get-Item -Path $7zExeInstallPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -ErrorAction SilentlyContinue
