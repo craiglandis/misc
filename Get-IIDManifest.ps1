@@ -130,6 +130,8 @@ function Invoke-ExpressionWithLogging
     }
 }
 
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+
 if (!$manifestName)
 {
     # https://github.com/Azure/azure-diskinspect-service/blob/master/manifests/windows/diagnostic
