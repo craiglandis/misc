@@ -256,7 +256,8 @@ elseif ($copy)
 
     if ($7zExePath)
     {
-        Invoke-ExpressionWithLogging "&$7zExePath -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
+        Invoke-ExpressionWithLogging "& '$7zExePath' -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
+        & "`"$7zExePath`" -bd a $destinationRoot.7z $destinationRoot\*"
     }
     elseif (Get-Command -Name Compress-Archive -ErrorAction SilentlyContinue)
     {
