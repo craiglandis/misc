@@ -224,12 +224,12 @@ elseif ($copy)
             if ($line -eq 'C:\Windows\System32\config\SOFTWARE')
             {
                 $line = 'C:\Windows\System32\config\SOFTWARE.hiv'
-                Invoke-ExpressionWithLogging "reg save HKLM\SOFTWARE $line /y"
+                $result = Invoke-ExpressionWithLogging "reg save HKLM\SOFTWARE $line /y"
             }
             if ($line -eq 'C:\Windows\System32\config\SYSTEM')
             {
                 $line = 'C:\Windows\System32\config\SYSTEM.hiv'
-                Invoke-ExpressionWithLogging "reg save HKLM\SYSTEM $line /y"
+                $result = Invoke-ExpressionWithLogging "reg save HKLM\SYSTEM $line /y"
             }
             if ($line -eq 'C:\Windows\SoftwareDistribution\datastore\DataStore.edb')
             {
