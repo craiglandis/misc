@@ -4,7 +4,8 @@ param(
     [switch]$copy,
     [switch]$show,
     [switch]$linux,
-    [switch]$windows
+    [switch]$windows,
+    [switch]$checkHandles
 )
 
 function Out-Log
@@ -191,7 +192,28 @@ elseif ($copy)
     {
         Out-Log "Not found $7zExePath"
         Out-Log "Installing 7-Zip"
-        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('https://www.7-zip.org/a/7z2301-x64.exe', 'c:\7z2301-x64.exe'); C:\7z2301-x64.exe /S"
+        $7zUrl = 'https://www.7-zip.org/a/7z2301-x64.exe'
+        $7zDownloadPath = 'C:\7z2301-x64.exe'
+        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$7zUrl', '$7zDownloadPath'); C:\7z2301-x64.exe /S"
+        $result = Invoke-Expression -Command $command
+        $command = "Remove-Item -Path $7zDownloadPath"
+        $result = Invoke-Expression -Command $command
+    }
+
+    if ($checkHandles)
+    {
+        $handleUrl = 'https://download.sysinternals.com/files/Handle.zip'
+        $handleDownloadPath = 'C:\Handle.zip'
+        $handleFolderPath = 'C:\Handle'
+        $handleExePath = "$handleFolderPath\handle64.exe"
+        $handleOutputFile = "$handleFolderPath\handle.txt"
+        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$handleUrl','$handleDownloadPath')"
+        $result = Invoke-Expression -Command $command
+        $command = "& '$7zExePath' x '$handleDownloadPath' -o'$handleFolderPath' -aoa -r"
+        $result = Invoke-Expression -Command $command
+        $command = "Remove-Item -Path $handleDownloadPath"
+        $result = Invoke-Expression -Command $command
+        $command = "$handleExePath dataStore.edb -accepteula -nobanner > $handleOutputFile; Get-Content -Path $handleOutputFile -ErrorAction SilentlyContinue"
         $result = Invoke-Expression -Command $command
     }
 
@@ -254,7 +276,11 @@ elseif ($copy)
                 $line = 'C:\Windows\System32\config\SYSTEM.hiv'
                 reg save HKLM\SYSTEM $line /y | Out-Null
             }
-            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue"
+            if ($line -eq 'C:\Windows\SoftwareDistribution\datastore\DataStore.edb')
+            {
+                Stop-Service -Name 'wuauserv'
+            }
+            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue" -verboseOnly
             foreach ($sourceFile in $sourceFiles)
             {
                 $sourceFilePath = $sourceFile.FullName
@@ -262,7 +288,16 @@ elseif ($copy)
                 $destinationPath = Join-Path -Path $destinationRoot -ChildPath $relativePath
                 $destinationDir = Split-Path -Path $destinationPath -Parent
                 New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
-                Copy-Item -Path $sourceFilePath -Destination $destinationPath
+                # DataStore.edb on some VMs is in use and can't be copied
+                # May be a client SKU thing where it's held open while still in OOBE (Win10/Win11)
+                # (get-item -path C:\Windows\SoftwareDistribution\datastore\DataStore.edb).Length/1MB
+                # https://download.sysinternals.com/files/Handle.zip
+                Invoke-ExpressionWithLogging "Copy-Item -Path '$sourceFilePath' -Destination '$destinationPath' -ErrorAction SilentlyContinue" -verboseOnly
+            }
+            $wuauservStatus = Get-Service -Name 'wuauserv' | Select-Object -ExpandProperty Status
+            if ($wuauservStatus -eq 'Stopped')
+            {
+                Start-Service -Name 'wuauserv'
             }
         }
     }
