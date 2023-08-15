@@ -181,16 +181,16 @@ if ($show)
 elseif ($copy)
 {
     $7zExePath = 'C:\Program Files\7-zip\7z.exe'
-    Write-PSFMessage "Checking for $7zExePath"
+    Out-Log "Checking for $7zExePath"
     $is7zExePresent = Test-Path -Path $7zExePath -PathType Leaf
     if ($is7zExePresent)
     {
-        Write-PSFMessage "Found $7zExePath"
+        Out-Log "Found $7zExePath"
     }
     else
     {
-        Write-PSFMessage "Not found $7zExePath"
-        Write-PSFMessage "Installing 7-Zip"
+        Out-Log "Not found $7zExePath"
+        Out-Log "Installing 7-Zip"
         $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('https://www.7-zip.org/a/7z2301-x64.exe', 'c:\7z2301-x64.exe'); C:\7z2301-x64.exe /S"
         $result = Invoke-Expression -Command $command
     }
@@ -222,7 +222,7 @@ elseif ($copy)
     }
     else
     {
-        Write-PSFMessage "Installing 7z.exe portable"
+        Out-Log "Installing 7z.exe portable"
         &$chocoExePath install 7zip.portable -y
     }
     #>
