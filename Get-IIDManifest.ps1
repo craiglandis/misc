@@ -180,6 +180,25 @@ if ($show)
 }
 elseif ($copy)
 {
+    $7zExePath = 'C:\Program Files\7-zip\7z.exe'
+    Write-PSFMessage "Checking for $7zExePath"
+    $is7zExePresent = Test-Path -Path $7zExePath -PathType Leaf
+    if ($is7zExePresent)
+    {
+        Write-PSFMessage "Found $7zExePath"
+    }
+    else
+    {
+        Write-PSFMessage "Not found $7zExePath"
+        Write-PSFMessage "Installing 7-Zip"
+        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('https://www.7-zip.org/a/7z2301-x64.exe', 'c:\7z2301-x64.exe'); C:\7z2301-x64.exe /S"
+        $result = Invoke-Expression -Command $command
+    }
+
+    <#
+    # Simpler just to install 7-Zip only instead of installing Chocolatey to then install 7-Zip
+    # since chocolatey is only being used in the script to install that one thing
+    # Also, on WS12, installing Chocolatey installs Netfx 4.8 which requires a reboot
     $chocoExePath = 'C:\ProgramData\chocolatey\bin\choco.exe'
     $chocolateyInstalled = Test-Path -Path $chocoExePath -PathType Leaf
     if ($chocolateyInstalled -eq $false)
@@ -206,6 +225,7 @@ elseif ($copy)
         Write-PSFMessage "Installing 7z.exe portable"
         &$chocoExePath install 7zip.portable -y
     }
+    #>
 
     $destinationRoot = "$outputPath\$($env:computername)_$(Get-Date -Format yyyyMMddHHmmss)"
     if ((Test-Path -Path $destinationRoot -PathType Container) -eq $false)
