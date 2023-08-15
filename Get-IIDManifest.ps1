@@ -1,6 +1,6 @@
 param(
     [string]$manifestName,
-    [string]$outputPath = 'c:\logs',
+    [string]$outputPath = 'C:\logs',
     [switch]$copy,
     [switch]$show,
     [switch]$linux,
@@ -238,9 +238,22 @@ elseif ($copy)
         if ($line.StartsWith('copy'))
         {
             # copy,/WindowsAzure/Logs/Plugins/*/*/CommandExecution.log
+            # copy,/Boot/BCD,noscan
+            # https://raw.githubusercontent.com/Azure/azure-diskinspect-service/master/manifests/windows/windowsupdate
+            $line = $line.Replace(',noscan','')
             $line = $line.Split(',')[-1]
             $line = $line.Replace('/','\')
             $line = "C:$line"
+            if ($line -eq 'C:\Windows\System32\config\SOFTWARE')
+            {
+                $line = 'C:\Windows\System32\config\SOFTWARE.hiv'
+                reg save HKLM\SOFTWARE $line /y | Out-Null
+            }
+            if ($line -eq 'C:\Windows\System32\config\SYSTEM')
+            {
+                $line = 'C:\Windows\System32\config\SYSTEM.hiv'
+                reg save HKLM\SYSTEM $line /y | Out-Null
+            }
             $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue"
             foreach ($sourceFile in $sourceFiles)
             {
@@ -256,8 +269,8 @@ elseif ($copy)
 
     if ($7zExePath)
     {
-        Invoke-ExpressionWithLogging "& '$7zExePath' -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
-        & "`"$7zExePath`" -bd a $destinationRoot.7z $destinationRoot\*"
+        $result = Invoke-ExpressionWithLogging "& '$7zExePath' -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
+        #& "`"$7zExePath`" -bd a $destinationRoot.7z $destinationRoot\*"
     }
     elseif (Get-Command -Name Compress-Archive -ErrorAction SilentlyContinue)
     {
