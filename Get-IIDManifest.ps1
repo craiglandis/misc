@@ -182,22 +182,12 @@ if ($show)
 elseif ($copy)
 {
     $7zExePath = 'C:\Program Files\7-zip\7z.exe'
-    Out-Log "Checking for $7zExePath"
-    $is7zExePresent = Test-Path -Path $7zExePath -PathType Leaf
-    if ($is7zExePresent)
+    if ((Test-Path -Path $7zExePath -PathType Leaf) -eq $false)
     {
-        Out-Log "Found $7zExePath"
-    }
-    else
-    {
-        Out-Log "Not found $7zExePath"
-        Out-Log "Installing 7-Zip"
         $7zUrl = 'https://www.7-zip.org/a/7z2301-x64.exe'
         $7zDownloadPath = 'C:\7z2301-x64.exe'
-        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$7zUrl', '$7zDownloadPath'); C:\7z2301-x64.exe /S"
-        $result = Invoke-Expression -Command $command
-        $command = "Remove-Item -Path $7zDownloadPath"
-        $result = Invoke-Expression -Command $command
+        $result = Invoke-ExpressionWithLogging "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$7zUrl', '$7zDownloadPath'); C:\7z2301-x64.exe /S"
+        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $7zDownloadPath"
     }
 
     if ($checkHandles)
@@ -207,15 +197,93 @@ elseif ($copy)
         $handleFolderPath = 'C:\Handle'
         $handleExePath = "$handleFolderPath\handle64.exe"
         $handleOutputFile = "$handleFolderPath\handle.txt"
-        $command = "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$handleUrl','$handleDownloadPath')"
-        $result = Invoke-Expression -Command $command
-        $command = "& '$7zExePath' x '$handleDownloadPath' -o'$handleFolderPath' -aoa -r"
-        $result = Invoke-Expression -Command $command
-        $command = "Remove-Item -Path $handleDownloadPath"
-        $result = Invoke-Expression -Command $command
-        $command = "$handleExePath dataStore.edb -accepteula -nobanner > $handleOutputFile; Get-Content -Path $handleOutputFile -ErrorAction SilentlyContinue"
-        $result = Invoke-Expression -Command $command
+
+        $result = Invoke-ExpressionWithLogging "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$handleUrl','$handleDownloadPath')"
+        $result = Invoke-ExpressionWithLogging "& '$7zExePath' x '$handleDownloadPath' -o'$handleFolderPath' -aoa -r"
+        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $handleDownloadPath"
+        $result = Invoke-ExpressionWithLogging "$handleExePath dataStore.edb -accepteula -nobanner > $handleOutputFile; Get-Content -Path $handleOutputFile -ErrorAction SilentlyContinue"
     }
+
+    $destinationRoot = "$outputPath\$($env:computername)_$(Get-Date -Format yyyyMMddHHmmss)"
+    if ((Test-Path -Path $destinationRoot -PathType Container) -eq $false)
+    {
+        New-Item -Path $destinationRoot -ItemType Directory | Out-Null
+    }
+
+    foreach ($line in $manifest)
+    {
+        if ($line.StartsWith('copy'))
+        {
+            # copy,/WindowsAzure/Logs/Plugins/*/*/CommandExecution.log
+            # copy,/Boot/BCD,noscan
+            # https://raw.githubusercontent.com/Azure/azure-diskinspect-service/master/manifests/windows/windowsupdate
+            $line = $line.Replace(',noscan','')
+            $line = $line.Split(',')[-1]
+            $line = $line.Replace('/','\')
+            $line = "C:$line"
+            if ($line -eq 'C:\Windows\System32\config\SOFTWARE')
+            {
+                $line = 'C:\Windows\System32\config\SOFTWARE.hiv'
+                Invoke-ExpressionWithLogging "reg save HKLM\SOFTWARE $line /y"
+            }
+            if ($line -eq 'C:\Windows\System32\config\SYSTEM')
+            {
+                $line = 'C:\Windows\System32\config\SYSTEM.hiv'
+                Invoke-ExpressionWithLogging "reg save HKLM\SYSTEM $line /y"
+            }
+            if ($line -eq 'C:\Windows\SoftwareDistribution\datastore\DataStore.edb')
+            {
+                # DataStore.edb sometimes can't be copied unless wuauserv is stopped first
+                Invoke-ExpressionWithLogging "Stop-Service -Name 'wuauserv'"
+            }
+            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue" -verboseOnly
+            foreach ($sourceFile in $sourceFiles)
+            {
+                $sourceFilePath = $sourceFile.FullName
+                $relativePath = $sourceFilePath.Substring(2)
+                $destinationPath = Join-Path -Path $destinationRoot -ChildPath $relativePath
+                $destinationDir = Split-Path -Path $destinationPath -Parent
+                New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
+                Invoke-ExpressionWithLogging "Copy-Item -Path '$sourceFilePath' -Destination '$destinationPath' -ErrorAction SilentlyContinue" -verboseOnly
+            }
+            $wuauservStatus = Get-Service -Name 'wuauserv' | Select-Object -ExpandProperty Status
+            if ($wuauservStatus -eq 'Stopped')
+            {
+                Invoke-ExpressionWithLogging "Start-Service -Name 'wuauserv'"
+            }
+        }
+    }
+
+    if ($7zExePath)
+    {
+        $result = Invoke-ExpressionWithLogging "& '$7zExePath' -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
+        #& "`"$7zExePath`" -bd a $destinationRoot.7z $destinationRoot\*"
+    }
+    elseif (Get-Command -Name Compress-Archive -ErrorAction SilentlyContinue)
+    {
+        Invoke-ExpressionWithLogging "Compress-Archive -Path '$destinationRoot\*' -DestinationPath '$destinationRoot.zip'"
+    }
+    else
+    {
+        $folderPath = $destinationRoot
+        $zipFilePath = "$destinationRoot.zip"
+        Set-Content -Path $zipFilePath -Value ("PK" + [char]5 + [char]6 + ("$([char]0)" * 18))
+        $shellApplication = New-Object -ComObject Shell.Application
+        $zipPackage = $shellApplication.NameSpace($zipFilePath)
+        $filesToCompress = $shellApplication.NameSpace($folderPath).Items()
+        $zipPackage.CopyHere($filesToCompress)
+        $sourceCount = $filesToCompress.Count
+        while ($zipPackage.Items().Count -lt $sourceCount) {
+            Start-Sleep -Milliseconds 100
+        }
+        Write-Output "Folder compressed to $zipFilePath"
+    }
+}
+else
+{
+    Invoke-Item -Path $manifestPath
+    $global:manifest
+}
 
     <#
     # Simpler just to install 7-Zip only instead of installing Chocolatey to then install 7-Zip
@@ -248,94 +316,3 @@ elseif ($copy)
         &$chocoExePath install 7zip.portable -y
     }
     #>
-
-    $destinationRoot = "$outputPath\$($env:computername)_$(Get-Date -Format yyyyMMddHHmmss)"
-    if ((Test-Path -Path $destinationRoot -PathType Container) -eq $false)
-    {
-        New-Item -Path $destinationRoot -ItemType Directory | Out-Null
-    }
-
-    foreach ($line in $manifest)
-    {
-        if ($line.StartsWith('copy'))
-        {
-            # copy,/WindowsAzure/Logs/Plugins/*/*/CommandExecution.log
-            # copy,/Boot/BCD,noscan
-            # https://raw.githubusercontent.com/Azure/azure-diskinspect-service/master/manifests/windows/windowsupdate
-            $line = $line.Replace(',noscan','')
-            $line = $line.Split(',')[-1]
-            $line = $line.Replace('/','\')
-            $line = "C:$line"
-            if ($line -eq 'C:\Windows\System32\config\SOFTWARE')
-            {
-                $line = 'C:\Windows\System32\config\SOFTWARE.hiv'
-                reg save HKLM\SOFTWARE $line /y | Out-Null
-            }
-            if ($line -eq 'C:\Windows\System32\config\SYSTEM')
-            {
-                $line = 'C:\Windows\System32\config\SYSTEM.hiv'
-                reg save HKLM\SYSTEM $line /y | Out-Null
-            }
-            if ($line -eq 'C:\Windows\SoftwareDistribution\datastore\DataStore.edb')
-            {
-                Stop-Service -Name 'wuauserv'
-            }
-            $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue" -verboseOnly
-            foreach ($sourceFile in $sourceFiles)
-            {
-                $sourceFilePath = $sourceFile.FullName
-                $relativePath = $sourceFilePath.Substring(2)
-                $destinationPath = Join-Path -Path $destinationRoot -ChildPath $relativePath
-                $destinationDir = Split-Path -Path $destinationPath -Parent
-                New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
-                # DataStore.edb on some VMs is in use and can't be copied
-                # May be a client SKU thing where it's held open while still in OOBE (Win10/Win11)
-                # (get-item -path C:\Windows\SoftwareDistribution\datastore\DataStore.edb).Length/1MB
-                # https://download.sysinternals.com/files/Handle.zip
-                Invoke-ExpressionWithLogging "Copy-Item -Path '$sourceFilePath' -Destination '$destinationPath' -ErrorAction SilentlyContinue" -verboseOnly
-            }
-            $wuauservStatus = Get-Service -Name 'wuauserv' | Select-Object -ExpandProperty Status
-            if ($wuauservStatus -eq 'Stopped')
-            {
-                Start-Service -Name 'wuauserv'
-            }
-        }
-    }
-
-    if ($7zExePath)
-    {
-        $result = Invoke-ExpressionWithLogging "& '$7zExePath' -bd a $destinationRoot.7z $destinationRoot\*" #| Out-Null
-        #& "`"$7zExePath`" -bd a $destinationRoot.7z $destinationRoot\*"
-    }
-    elseif (Get-Command -Name Compress-Archive -ErrorAction SilentlyContinue)
-    {
-        Invoke-ExpressionWithLogging "Compress-Archive -Path '$destinationRoot\*' -DestinationPath '$destinationRoot.zip'"
-    }
-    else
-    {
-        $folderPath = $destinationRoot
-        $zipFilePath = "$destinationRoot.zip"
-
-        # Create a blank zip file
-        Set-Content -Path $zipFilePath -Value ("PK" + [char]5 + [char]6 + ("$([char]0)" * 18))
-
-        # Use Shell.Application to compress the folder
-        $shellApplication = New-Object -ComObject Shell.Application
-        $zipPackage = $shellApplication.NameSpace($zipFilePath)
-        $filesToCompress = $shellApplication.NameSpace($folderPath).Items()
-        $zipPackage.CopyHere($filesToCompress)
-
-        # Wait for compression to complete
-        $sourceCount = $filesToCompress.Count
-        while ($zipPackage.Items().Count -lt $sourceCount) {
-            Start-Sleep -Milliseconds 100
-        }
-
-        Write-Output "Folder compressed to $zipFilePath"
-    }
-}
-else
-{
-    Invoke-Item -Path $manifestPath
-    $global:manifest
-}
