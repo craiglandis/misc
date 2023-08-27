@@ -13,12 +13,26 @@ function Out-Log
     param(
         [string]$text,
         [switch]$verboseOnly,
-        [string]$prefix,
+        [ValidateSet('timespan','both')]
+        [string]$prefix = 'both',
+        [ValidateSet('hours','minutes','seconds')]
+        [string]$timespanFormat = 'minutes',
+        [switch]$dateCondensed = $true,
+        [switch]$milliseconds,
         [switch]$raw,
         [switch]$logonly,
         [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
         [string]$color = 'White'
     )
+
+    if ($dateCondensed)
+    {
+        $dateFormat = 'ddhhmmss'
+    }
+    else
+    {
+        $dateFormat = 'yyyy-MM-dd hh:mm:ss'
+    }
 
     if ($verboseOnly)
     {
@@ -60,26 +74,76 @@ function Out-Log
         }
         else
         {
+            if (!$global:scriptStartTime)
+            {
+                $global:scriptStartTime = Get-Date
+            }
+            # if ($prefix -eq 'timespan' -and $global:scriptStartTime)
             if ($prefix -eq 'timespan' -and $global:scriptStartTime)
             {
                 $timespan = New-TimeSpan -Start $global:scriptStartTime -End (Get-Date)
-                $prefixString = '{0:hh}:{0:mm}:{0:ss}.{0:ff}' -f $timespan
+                if ($timespanFormat -eq 'hours')
+                {
+                    $format = '{0:hh}:{0:mm}:{0:ss}'
+                    #$prefixString = '{0:hh}:{0:mm}:{0:ss}.{0:ff}' -f $timespan
+                }
+                elseif ($timespanFormat -eq 'minutes')
+                {
+                    $format = '{0:mm}:{0:ss}'
+                    #$prefixString = '{0:mm}:{0:ss}.{0:ff}' -f $timespan
+                }
+                elseif ($timespanFormat -eq 'seconds')
+                {
+                    $format = '{0:ss}'
+                    #$prefixString = '{0:ss}.{0:ff}' -f $timespan
+                }
+                if ($milliseconds)
+                {
+                    $format = "$($format).{0:ff}"
+                }
+                $prefixString = $format -f $timespan
+                # $prefixString = "[$prefixString]"
+                $prefixString = $prefixString
             }
+            # elseif ($prefix -eq 'both' -and $global:scriptStartTime)
             elseif ($prefix -eq 'both' -and $global:scriptStartTime)
             {
-                $timestamp = Get-Date -Format 'yyyy-MM-dd hh:mm:ss'
+                $timestamp = Get-Date -Format $dateFormat
+                # $timespan = New-TimeSpan -Start $global:scriptStartTime -End (Get-Date)
                 $timespan = New-TimeSpan -Start $global:scriptStartTime -End (Get-Date)
-                $prefixString = "$($timestamp) $('{0:hh}:{0:mm}:{0:ss}.{0:ff}' -f $timespan)"
+
+                if ($timespanFormat -eq 'hours')
+                {
+                    $format = '{0:hh}:{0:mm}:{0:ss}'
+                    #$prefixString = '{0:hh}:{0:mm}:{0:ss}.{0:ff}' -f $timespan
+                }
+                elseif ($timespanFormat -eq 'minutes')
+                {
+                    $format = '{0:mm}:{0:ss}'
+                    #$prefixString = '{0:mm}:{0:ss}.{0:ff}' -f $timespan
+                }
+                elseif ($timespanFormat -eq 'seconds')
+                {
+                    $format = '{0:ss}'
+                    #$prefixString = '{0:ss}.{0:ff}' -f $timespan
+                }
+                if ($milliseconds)
+                {
+                    $format = "$($format).{0:ff}"
+                }
+                $prefixString = $format -f $timespan
+                $prefixString = "$cyan$timestamp$reset $blue$prefixString$reset"
             }
             else
             {
-                $prefixString = Get-Date -Format 'yyyy-MM-dd hh:mm:ss'
+                $prefixString = Get-Date -Format $dateFormat
             }
 
             if ($logonly)
             {
                 if ($logFilePath)
                 {
+                    $prefixString = $prefixString.Replace("$cyan","").Replace("$blue","").Replace("$reset","")
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
@@ -89,6 +153,7 @@ function Out-Log
                 Write-Host " $text" -ForegroundColor $color
                 if ($logFilePath)
                 {
+                    $prefixString = $prefixString.Replace("$cyan","").Replace("$blue","").Replace("$reset","")
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
@@ -114,6 +179,8 @@ function Invoke-ExpressionWithLogging
     {
         Out-Log $command
     }
+
+    $command = $command.Replace($green,'').Replace($reset,'')
 
     try
     {
