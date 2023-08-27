@@ -235,7 +235,8 @@ elseif ($copy)
             {
                 # DataStore.edb sometimes can't be copied unless wuauserv is stopped first
                 # But this was messing with my guest patching tests, so commenting out for now
-                # Invoke-ExpressionWithLogging "Stop-Service -Name 'wuauserv'"
+                # Invoke-ExpressionWithLogging "Stop-Service -Name 'wuauserv' -ErrorAction SilentlyContinue"
+                $line = 'C:\FileThatDoesNotExist'
             }
             $sourceFiles = Invoke-ExpressionWithLogging "Get-Childitem -Path '$line' -ErrorAction SilentlyContinue" -verboseOnly
             foreach ($sourceFile in $sourceFiles)
@@ -251,7 +252,7 @@ elseif ($copy)
             $wuauservStatus = Get-Service -Name 'wuauserv' | Select-Object -ExpandProperty Status
             if ($wuauservStatus -eq 'Stopped')
             {
-                Invoke-ExpressionWithLogging "Start-Service -Name 'wuauserv'"
+                Invoke-ExpressionWithLogging "Start-Service -Name 'wuauserv' -ErrorAction SilentlyContinue"
             }
             #>
         }
