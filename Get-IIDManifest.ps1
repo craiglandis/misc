@@ -155,7 +155,7 @@ function Out-Log
             {
                 if ($logFilePath)
                 {
-                    $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
+                    # $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
@@ -230,7 +230,7 @@ function Invoke-ExpressionWithLogging
         Out-Log $command
     }
 
-    $command = $command.Replace($green, '').Replace($reset, '')
+    # $command = $command.Replace($green, '').Replace($reset, '')
 
     try
     {
