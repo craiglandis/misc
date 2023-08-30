@@ -151,11 +151,11 @@ function Out-Log
                 $prefixString = Get-Date -Format $dateFormat
             }
 
-            if ($logonly)
+            if ($logonly -or $global:quiet)
             {
                 if ($logFilePath)
                 {
-                    # $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
+                    $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
@@ -266,7 +266,7 @@ if ((Test-Path -Path $global:logFilePath -PathType Container) -eq $false)
 {
     New-Item -Path $global:logFilePath -ItemType File -Force | Out-Null
 }
-Out-Log "Log file: $cyan$global:logFilePath$reset"
+Out-Log "Log file: $cyan$global:logFilePath$reset" -verboseOnly
 
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 
