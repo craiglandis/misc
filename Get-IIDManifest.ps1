@@ -1,3 +1,4 @@
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$manifestName,
     [string]$outputPath = 'C:\logs',
@@ -13,15 +14,16 @@ function Out-Log
     param(
         [string]$text,
         [switch]$verboseOnly,
-        [ValidateSet('timespan','both')]
+        [switch]$sameline,
+        [ValidateSet('timespan', 'both')]
         [string]$prefix = 'both',
-        [ValidateSet('hours','minutes','seconds')]
+        [ValidateSet('hours', 'minutes', 'seconds')]
         [string]$timespanFormat = 'minutes',
         [switch]$dateCondensed = $true,
         [switch]$milliseconds,
         [switch]$raw,
         [switch]$logonly,
-        [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
+        # [ValidateSet('Black', 'DarkBlue', 'DarkGreen', 'DarkCyan', 'DarkRed', 'DarkMagenta', 'DarkYellow', 'Gray', 'DarkGray', 'Blue', 'Green', 'Cyan', 'Red', 'Magenta', 'Yellow', 'White')]
         [string]$color = 'White'
     )
 
@@ -36,7 +38,17 @@ function Out-Log
 
     if ($verboseOnly)
     {
-        if ($verbose)
+        $global:callstack = Get-PSCallStack
+        $caller = $callstack | select-object -first 1 -skip 1
+        $caller = $caller.InvocationInfo.MyCommand.Name
+        if ($caller -eq 'Invoke-ExpressionWithLogging')
+        {
+            $caller = $callstack | select-object -first 1 -skip 2
+            $caller = $caller.InvocationInfo.MyCommand.Name
+        }
+        $caller = "$yellow$caller$reset"
+        # Write-Host "$scriptName `$verboseOnly: $verboseOnly `$global:verbose: $global:verbose" -ForegroundColor Magenta
+        if ($global:verbose)
         {
             $outputNeeded = $true
             $foreGroundColor = 'Yellow'
@@ -143,17 +155,55 @@ function Out-Log
             {
                 if ($logFilePath)
                 {
-                    $prefixString = $prefixString.Replace("$cyan","").Replace("$blue","").Replace("$reset","")
+                    # $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
             else
             {
-                Write-Host $prefixString -NoNewline -ForegroundColor Cyan
-                Write-Host " $text" -ForegroundColor $color
+                #<#
+                switch ($color)
+                {
+                    'Gray' {$color = $gray}
+                    'Red' {$color = $red}
+                    'Green' {$color = $green}
+                    'Yellow' {$color = $yellow}
+                    'Blue' {$color = $blue}
+                    'Magenta' {$color = $magenta}
+                    'Cyan' {$color = $cyan}
+                    'White' {$color = $white}
+                    Default {$white}
+                }
+                #>
+
+                if ($verboseOnly)
+                {
+                    $prefixString = "$prefixString [$caller]"
+                }
+
+                if ($sameline)
+                {
+                    $script:lastCallWasSameLine = $true
+                    Write-Host "`r$cyan$prefixString$reset $text" -NoNewline
+                    #Write-Host "`r$prefixString $cyan$text$reset" -NoNewline
+                    #Write-Host "`r$prefixString" -NoNewline -ForegroundColor Cyan
+                    #Write-Host "`r $text" -ForegroundColor $color -NoNewline
+                }
+                else
+                {
+                    if ($script:lastCallWasSameLine)
+                    {
+                        Write-Host ''
+                        $script:lastCallWasSameLine = $null
+                    }
+                    Write-Host $prefixString -NoNewline -ForegroundColor Gray
+                    Write-Host " $text"  #-ForegroundColor $color
+                    # Write-Host "$cyan$prefixString$reset $color$text$reset"
+                }
+
                 if ($logFilePath)
                 {
-                    $prefixString = $prefixString.Replace("$cyan","").Replace("$blue","").Replace("$reset","")
+                    # $prefixString = $prefixString.Replace("$cyan", '').Replace("$blue", '').Replace("$reset", '')
                     "$prefixString $text" | Out-File $logFilePath -Append
                 }
             }
@@ -180,7 +230,7 @@ function Invoke-ExpressionWithLogging
         Out-Log $command
     }
 
-    $command = $command.Replace($green,'').Replace($reset,'')
+    $command = $command.Replace($green, '').Replace($reset, '')
 
     try
     {
@@ -197,6 +247,26 @@ function Invoke-ExpressionWithLogging
         }
     }
 }
+
+$global:verbose = [bool]$PSBoundParameters['verbose']
+$global:debug = [bool]$PSBoundParameters['debug']
+
+$global:scriptStartTime = Get-Date
+$scriptStartTimeString = Get-Date -Date $scriptStartTime -Format yyyyMMddHHmmss
+$scriptFullName = $MyInvocation.MyCommand.Path
+$scriptFolderPath = Split-Path -Path $scriptFullName
+$scriptName = Split-Path -Path $scriptFullName -Leaf
+$scriptBaseName = $scriptName.Split('.')[0]
+$host.UI.RawUI.WindowTitle = "$($scriptBaseName.ToUpper())"
+
+$logFolderParentPath = "C:\Logs"
+$logFolderPath = "$logFolderParentPath\$scriptBaseName"
+$global:logFilePath = "$logFolderPath\$($scriptBaseName)_$(Get-Date -Format yyyyMMddhhmmss).log"
+if ((Test-Path -Path $global:logFilePath -PathType Container) -eq $false)
+{
+    New-Item -Path $global:logFilePath -ItemType File -Force | Out-Null
+}
+Out-Log "Log file: $cyan$global:logFilePath$reset"
 
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 
