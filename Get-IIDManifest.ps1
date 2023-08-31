@@ -248,6 +248,8 @@ function Invoke-ExpressionWithLogging
     }
 }
 
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+
 $global:verbose = [bool]$PSBoundParameters['verbose']
 $global:debug = [bool]$PSBoundParameters['debug']
 
