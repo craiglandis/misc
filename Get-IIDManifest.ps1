@@ -326,7 +326,7 @@ elseif ($copy)
         $7zUrl = 'https://www.7-zip.org/a/7z2301-x64.exe'
         $7zDownloadPath = 'C:\7z2301-x64.exe'
         $result = Invoke-ExpressionWithLogging "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$7zUrl', '$7zDownloadPath'); C:\7z2301-x64.exe /S"
-        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $7zDownloadPath"
+        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $7zDownloadPath -ErrorAction SilentlyContinue"
     }
 
     if ($checkHandles)
@@ -339,7 +339,7 @@ elseif ($copy)
 
         $result = Invoke-ExpressionWithLogging "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; (New-Object Net.Webclient).DownloadFile('$handleUrl','$handleDownloadPath')"
         $result = Invoke-ExpressionWithLogging "& '$7zExePath' x '$handleDownloadPath' -o'$handleFolderPath' -aoa -r"
-        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $handleDownloadPath"
+        $result = Invoke-ExpressionWithLogging "Remove-Item -Path $handleDownloadPath -ErrorAction SilentlyContinue"
         $result = Invoke-ExpressionWithLogging "$handleExePath dataStore.edb -accepteula -nobanner > $handleOutputFile; Get-Content -Path $handleOutputFile -ErrorAction SilentlyContinue"
     }
 
