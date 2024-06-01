@@ -1,4 +1,7 @@
+# Make sure 5985 is open
+# vms -nameOnly -windows | %{Add-NSGRuleForLocalIP.ps1 -resourceGroupName rg -name $_}
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Force
+Set-Service -Name winmgmt -StartupType Automatic -Status Running
 Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private
 Enable-PSRemoting -SkipNetworkProfileCheck -Force
 winrm quickconfig -q
